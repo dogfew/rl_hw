@@ -28,9 +28,9 @@ class SumTree():
         input: p - float, new priority value
         """
         assert idx < self.capacity, "SumTree overflow"
-        
+
         idx += self.capacity - 1  # going to leaf №i
-        
+
         change = p - self.tree[idx]
         self.tree[idx] = p
         while idx != 0:    # faster than the recursive loop
@@ -57,9 +57,13 @@ class SumTree():
                     parent_idx = cr_idx
 
         return leaf_idx - (self.capacity - 1)
-        
+
     def __getitem__(self, indices):
-        return self.tree[indices + self.capacity - 1]
+        res = []
+        for idx in indices:
+            new_idx = idx + self.capacity - 1
+            res.append(self.tree[new_idx])
+        return res
 
     @property
     def total_p(self):
@@ -102,13 +106,24 @@ class PrioritizedSampler():
         """
         '''
         # sample batch_size indices
-        indices = <YOUR CODE>
-        
-        priorities = self.priorities[indices]
-        
+        s = self.priorities.total_p / batch_size
+        indices = [
+            self.priorities.get_leaf(
+                random.uniform(s * i,  s * (i + 1))
+            )
+            for i in range(batch_size)
+        ]
+        probabilities = self.priorities[indices] / self.priorities.total_p
+
         # you can change this to implement bias correction
-        weights = np.ones(batch_size)
+        weights = (len(self) * probabilities) ** -self.beta
+        weights = weights / weights.max()
         return indices, weights
+
+    def __len__(self):
+        if None in self.storage:
+            return self.storage.index(None)
+        return len(self.storage)
 
     def update_priorities(self, indices, new_priorities):
         '''
@@ -123,7 +138,7 @@ class PrioritizedSampler():
         new_priorities = (new_priorities**self.rp_alpha).clip(min=1e-5, max=self.clip_priorities)
         
         # update priorities
-        <YOUR CODE>
-        
+        for idx, priority in zip(indices, new_priorities):
+            self.priorities.update(idx, priority)
         # update max priority for new transitions
         self.max_priority = max(self.max_priority, new_priorities.max())
